@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#000000" />
+  <title>Michael Haggerty — AR Experience</title>
+
+  <!-- MindAR + A-Frame from CDN (open source, MIT) -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+
+  <style>
+    :root {
+      --ink: #f4f1ea;
+      --bg: #0a0a0a;
+      --accent: #d4af37;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Georgia, 'Times New Roman', serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Welcome overlay — required for iOS audio + camera permission UX */
+    #start-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background:
+        radial-gradient(ellipse at 50% 30%, rgba(212, 175, 55, 0.08), transparent 60%),
+        linear-gradient(180deg, #0a0a0a 0%, #1a1410 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+      transition: opacity 0.6s ease;
+    }
+
+    #start-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .signature {
+      font-size: 0.75rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 3rem;
+      opacity: 0.85;
+    }
+
+    .title {
+      font-size: clamp(1.75rem, 6vw, 2.5rem);
+      font-weight: 400;
+      font-style: italic;
+      line-height: 1.2;
+      margin-bottom: 1.5rem;
+      max-width: 20ch;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      line-height: 1.6;
+      max-width: 32ch;
+      opacity: 0.75;
+      margin-bottom: 3rem;
+    }
+
+    .start-btn {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--ink);
+      padding: 1rem 2.5rem;
+      font-family: inherit;
+      font-size: 0.85rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .start-btn:hover, .start-btn:active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .instructions {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      opacity: 0.6;
+      text-align: center;
+      z-index: 50;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+
+    .instructions.hidden { opacity: 0; }
+
+    /* Scanning crosshair shown while looking for the painting */
+    .scan-hint {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(70vw, 280px);
+      aspect-ratio: 1;
+      border: 1px solid rgba(244, 241, 234, 0.3);
+      pointer-events: none;
+      z-index: 40;
+      transition: opacity 0.4s ease;
+    }
+
+    .scan-hint::before, .scan-hint::after,
+    .scan-hint > span::before, .scan-hint > span::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--accent);
+    }
+    .scan-hint::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+    .scan-hint::after { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+    .scan-hint > span::before { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+    .scan-hint > span::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+    .scan-hint.hidden { opacity: 0; }
+
+    a-scene { display: block; }
+  </style>
+</head>
+<body>
+
+  <!-- Welcome overlay — required to unlock camera + audio on mobile -->
+  <div id="start-overlay">
+    <div class="signature">Michael Haggerty</div>
+    <h1 class="title">A still moment, made moving.</h1>
+    <p class="subtitle">Point your phone at the painting after tapping below. Allow camera access when prompted. Tap the screen once playing to toggle sound.</p>
+    <button class="start-btn" id="start-btn">Begin Experience</button>
+  </div>
+
+  <!-- Scanning crosshair shown after start, hidden when target is found -->
+  <div class="scan-hint" id="scan-hint"><span></span></div>
+
+  <!-- Instructions footer -->
+  <div class="instructions" id="instructions">Aim camera at painting</div>
+
+  <!-- MindAR scene -->
+  <a-scene
+    mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
+    color-space="sRGB"
+    renderer="colorManagement: true, physicallyCorrectLights"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-assets>
+      <video
+        id="art-video"
+        src="film.mp4"
+        preload="auto"
+        loop
+        muted
+        playsinline
+        webkit-playsinline
+        crossorigin="anonymous">
+      </video>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!--
+      Target 0 = your painting.
+      width:1 matches the target image width. Height adjusts in JS once video metadata loads.
+    -->
+    <a-entity id="target" mindar-image-target="targetIndex: 0">
+      <a-video
+        id="ar-video-plane"
+        src="#art-video"
+        position="0 0 0"
+        rotation="0 0 0"
+        width="1"
+        height="0.5625"
+        opacity="1">
+      </a-video>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    const startOverlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const scanHint = document.getElementById('scan-hint');
+    const instructions = document.getElementById('instructions');
+    const video = document.getElementById('art-video');
+    const videoPlane = document.getElementById('ar-video-plane');
+    const scene = document.querySelector('a-scene');
+    const target = document.getElementById('target');
+
+    let started = false;
+
+    // Adjust video plane aspect ratio once we know the video dimensions
+    video.addEventListener('loadedmetadata', () => {
+      const aspect = video.videoHeight / video.videoWidth;
+      videoPlane.setAttribute('height', aspect);
+    });
+
+    // Target found — play video, hide UI
+    target.addEventListener('targetFound', () => {
+      scanHint.classList.add('hidden');
+      instructions.classList.add('hidden');
+      video.play().catch(err => console.log('Video play error:', err));
+    });
+
+    // Target lost — pause and show scan UI again
+    target.addEventListener('targetLost', () => {
+      scanHint.classList.remove('hidden');
+      instructions.classList.remove('hidden');
+      video.pause();
+    });
+
+    // Start button: unlocks media on iOS and kicks off AR
+    startBtn.addEventListener('click', async () => {
+      if (started) return;
+      started = true;
+
+      // Prime the video element so iOS allows playback later
+      try {
+        video.muted = true;
+        await video.play();
+        video.pause();
+        video.currentTime = 0;
+      } catch (err) {
+        console.log('Video prime error:', err);
+      }
+
+      startOverlay.classList.add('hidden');
+
+      // Start MindAR
+      const mindarSystem = scene.systems['mindar-image-system'];
+      try {
+        await mindarSystem.start();
+      } catch (err) {
+        console.error('MindAR start error:', err);
+        alert('Camera access is required. Please enable it in your browser settings and reload.');
+      }
+    });
+
+    // Tap anywhere on the live AR view to toggle sound
+    document.addEventListener('click', (e) => {
+      if (!started) return;
+      if (e.target.closest('#start-overlay')) return;
+      video.muted = !video.muted;
+    });
+  </script>
+</body>
+</html>
