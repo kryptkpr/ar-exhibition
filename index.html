@@ -29,6 +29,11 @@
       -webkit-tap-highlight-color: transparent;
     }
 
+    /* Ensure A-Frame canvas is transparent on top of the camera feed (Chrome fix) */
+    a-scene .a-canvas {
+      background: transparent !important;
+    }
+
     /* Welcome overlay — required for iOS audio + camera permission UX */
     #start-overlay {
       position: fixed;
@@ -112,7 +117,6 @@
 
     .instructions.hidden { opacity: 0; }
 
-    /* Scanning crosshair shown while looking for the painting */
     .scan-hint {
       position: fixed;
       top: 50%;
@@ -146,7 +150,6 @@
 </head>
 <body>
 
-  <!-- Welcome overlay — required to unlock camera + audio on mobile -->
   <div id="start-overlay">
     <div class="signature">Michael Haggerty</div>
     <h1 class="title">A still moment, made moving.</h1>
@@ -154,19 +157,16 @@
     <button class="start-btn" id="start-btn">Begin Experience</button>
   </div>
 
-  <!-- Scanning crosshair shown after start, hidden when target is found -->
   <div class="scan-hint" id="scan-hint"><span></span></div>
-
-  <!-- Instructions footer -->
   <div class="instructions" id="instructions">Aim camera at painting</div>
 
-  <!-- MindAR scene -->
+  <!-- alpha:true and transparent background are the Chrome camera-view fix -->
   <a-scene
     mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
     color-space="sRGB"
     renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true"
     background="transparent: true"
-    vr-mode-ui="enabled: true"
+    vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
     <a-assets>
@@ -184,10 +184,6 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!--
-      Target 0 = your painting.
-      width:1 matches the target image width. Height adjusts in JS once video metadata loads.
-    -->
     <a-entity id="target" mindar-image-target="targetIndex: 0">
       <a-video
         id="ar-video-plane"
@@ -213,32 +209,27 @@
 
     let started = false;
 
-    // Adjust video plane aspect ratio once we know the video dimensions
     video.addEventListener('loadedmetadata', () => {
       const aspect = video.videoHeight / video.videoWidth;
       videoPlane.setAttribute('height', aspect);
     });
 
-    // Target found — play video, hide UI
     target.addEventListener('targetFound', () => {
       scanHint.classList.add('hidden');
       instructions.classList.add('hidden');
       video.play().catch(err => console.log('Video play error:', err));
     });
 
-    // Target lost — pause and show scan UI again
     target.addEventListener('targetLost', () => {
       scanHint.classList.remove('hidden');
       instructions.classList.remove('hidden');
       video.pause();
     });
 
-    // Start button: unlocks media on iOS and kicks off AR
     startBtn.addEventListener('click', async () => {
       if (started) return;
       started = true;
 
-      // Prime the video element so iOS allows playback later
       try {
         video.muted = true;
         await video.play();
@@ -250,7 +241,6 @@
 
       startOverlay.classList.add('hidden');
 
-      // Start MindAR
       const mindarSystem = scene.systems['mindar-image-system'];
       try {
         await mindarSystem.start();
@@ -260,7 +250,6 @@
       }
     });
 
-    // Tap anywhere on the live AR view to toggle sound
     document.addEventListener('click', (e) => {
       if (!started) return;
       if (e.target.closest('#start-overlay')) return;
