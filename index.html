@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#000000" />
   <title>Michael Haggerty — AR Experience</title>
 
+  <!-- MindAR + A-Frame from CDN (open source, MIT licensed) -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 
@@ -28,21 +29,11 @@
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* ==================================================================
-       CHROME CAMERA FIX
-       MindAR injects a <video> element for the live camera feed.
-       In some Chrome versions it gets visibility:hidden or wrong z-index.
-       These rules force it visible and behind the AR canvas.
-       ================================================================== */
+    /* Camera feed must be visible behind the AR canvas (Chrome compatibility) */
     video {
       visibility: visible !important;
     }
 
-    .mindar-ui-overlay {
-      display: none !important;
-    }
-
-    /* The live camera <video> MindAR creates — make sure it's visible & full-size */
     body > video,
     a-scene + video,
     video[autoplay] {
@@ -57,7 +48,6 @@
       display: block !important;
     }
 
-    /* A-Frame canvas sits on top of the camera video, transparent */
     a-scene {
       position: fixed !important;
       top: 0 !important;
@@ -70,6 +60,8 @@
     a-scene .a-canvas, a-scene canvas {
       background: transparent !important;
     }
+
+    .mindar-ui-overlay { display: none !important; }
 
     /* Welcome overlay */
     #start-overlay {
@@ -147,6 +139,7 @@
       z-index: 50;
       pointer-events: none;
       transition: opacity 0.4s ease;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
     }
 
     .instructions.hidden { opacity: 0; }
@@ -178,50 +171,9 @@
     .scan-hint > span::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
     .scan-hint.hidden { opacity: 0; }
-
-    /* ==================================================================
-       DIAGNOSTIC LOG — visible on-screen so we can debug from your phone
-       ================================================================== */
-    #debug {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      max-height: 40vh;
-      overflow-y: auto;
-      background: rgba(0, 0, 0, 0.85);
-      color: #0f0;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      padding: 0.5rem;
-      z-index: 200;
-      line-height: 1.4;
-      border-bottom: 1px solid #0f0;
-    }
-    #debug .err { color: #f55; }
-    #debug .ok { color: #0f0; }
-    #debug .info { color: #ff0; }
-    #debug-toggle {
-      position: fixed;
-      top: 0.5rem;
-      right: 0.5rem;
-      z-index: 201;
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      border: 1px solid #555;
-      padding: 0.25rem 0.5rem;
-      font-size: 11px;
-      font-family: monospace;
-      cursor: pointer;
-    }
-    #debug.hidden { display: none; }
   </style>
 </head>
 <body>
-
-  <!-- Diagnostic log -->
-  <div id="debug"></div>
-  <button id="debug-toggle">hide log</button>
 
   <div id="start-overlay">
     <div class="signature">Michael Haggerty</div>
@@ -270,36 +222,6 @@
   </a-scene>
 
   <script>
-    // ===== Diagnostic logger =====
-    const debugEl = document.getElementById('debug');
-    const debugToggle = document.getElementById('debug-toggle');
-
-    function log(msg, type = 'info') {
-      const time = new Date().toLocaleTimeString();
-      const line = document.createElement('div');
-      line.className = type;
-      line.textContent = `[${time}] ${msg}`;
-      debugEl.appendChild(line);
-      debugEl.scrollTop = debugEl.scrollHeight;
-      console.log(`[AR-DEBUG] ${msg}`);
-    }
-
-    debugToggle.addEventListener('click', () => {
-      debugEl.classList.toggle('hidden');
-      debugToggle.textContent = debugEl.classList.contains('hidden') ? 'show log' : 'hide log';
-    });
-
-    // Catch any uncaught errors
-    window.addEventListener('error', (e) => {
-      log(`ERROR: ${e.message} @ ${e.filename}:${e.lineno}`, 'err');
-    });
-
-    log(`Page loaded. UA: ${navigator.userAgent.substring(0, 80)}...`, 'info');
-    log(`HTTPS: ${location.protocol === 'https:' ? 'YES' : 'NO (camera will fail!)'}`,
-        location.protocol === 'https:' ? 'ok' : 'err');
-    log(`mediaDevices supported: ${!!navigator.mediaDevices}`, navigator.mediaDevices ? 'ok' : 'err');
-
-    // ===== AR setup =====
     const startOverlay = document.getElementById('start-overlay');
     const startBtn = document.getElementById('start-btn');
     const scanHint = document.getElementById('scan-hint');
@@ -311,102 +233,53 @@
 
     let started = false;
 
+    // Match video plane to actual video aspect ratio (works for landscape or portrait)
     video.addEventListener('loadedmetadata', () => {
       const aspect = video.videoHeight / video.videoWidth;
       videoPlane.setAttribute('height', aspect);
-      log(`Film video metadata loaded: ${video.videoWidth}x${video.videoHeight}`, 'ok');
-    });
-
-    video.addEventListener('error', (e) => {
-      log(`Film video error: ${video.error ? video.error.message : 'unknown'}`, 'err');
     });
 
     target.addEventListener('targetFound', () => {
-      log('Target FOUND — playing film', 'ok');
       scanHint.classList.add('hidden');
       instructions.classList.add('hidden');
-      video.play().catch(err => log(`Film play error: ${err.message}`, 'err'));
+      video.play().catch(() => {});
     });
 
     target.addEventListener('targetLost', () => {
-      log('Target lost — pausing film', 'info');
       scanHint.classList.remove('hidden');
       instructions.classList.remove('hidden');
       video.pause();
     });
 
-    scene.addEventListener('renderstart', () => {
-      log('A-Frame render started', 'ok');
-    });
-
     startBtn.addEventListener('click', async () => {
       if (started) return;
       started = true;
-      log('Begin button tapped', 'info');
 
+      // Prime video for iOS Safari autoplay rules
       try {
         video.muted = true;
         await video.play();
         video.pause();
         video.currentTime = 0;
-        log('Film video primed successfully', 'ok');
       } catch (err) {
-        log(`Film prime error: ${err.message}`, 'err');
+        // Some browsers will block this; AR still works, just no audio until user tap
       }
 
       startOverlay.classList.add('hidden');
 
       const mindarSystem = scene.systems['mindar-image-system'];
-      if (!mindarSystem) {
-        log('MindAR system NOT FOUND on scene!', 'err');
-        return;
-      }
-      log('MindAR system found, calling start()...', 'info');
-
       try {
         await mindarSystem.start();
-        log('MindAR start() resolved', 'ok');
-
-        // Inspect what camera video element MindAR created
-        setTimeout(() => {
-          const videos = document.querySelectorAll('video');
-          log(`Total <video> elements on page: ${videos.length}`, 'info');
-          videos.forEach((v, i) => {
-            const isFilm = v.id === 'art-video';
-            const label = isFilm ? 'FILM' : 'CAMERA?';
-            const visible = window.getComputedStyle(v).visibility;
-            const display = window.getComputedStyle(v).display;
-            const zIndex = window.getComputedStyle(v).zIndex;
-            const w = v.videoWidth;
-            const h = v.videoHeight;
-            const playing = !v.paused;
-            log(`  video[${i}] (${label}): ${w}x${h} vis=${visible} disp=${display} z=${zIndex} playing=${playing}`,
-                (w > 0 || isFilm) ? 'ok' : 'err');
-            if (!isFilm && v.srcObject) {
-              log(`  video[${i}] has srcObject (live stream): YES`, 'ok');
-              // Force visibility one more time
-              v.style.visibility = 'visible';
-              v.style.display = 'block';
-              v.style.zIndex = '1';
-            } else if (!isFilm) {
-              log(`  video[${i}] has srcObject: NO`, 'err');
-            }
-          });
-        }, 1500);
-
       } catch (err) {
-        log(`MindAR start error: ${err.message}`, 'err');
         alert('Camera access is required. Please enable it in your browser settings and reload.');
       }
     });
 
+    // Tap to toggle audio (excludes the start overlay so the begin button still works)
     document.addEventListener('click', (e) => {
       if (!started) return;
       if (e.target.closest('#start-overlay')) return;
-      if (e.target.closest('#debug')) return;
-      if (e.target.closest('#debug-toggle')) return;
       video.muted = !video.muted;
-      log(`Audio ${video.muted ? 'muted' : 'unmuted'}`, 'info');
     });
   </script>
 </body>
