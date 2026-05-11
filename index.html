@@ -164,8 +164,9 @@
   <a-scene
     mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
     color-space="sRGB"
-    renderer="colorManagement: true, physicallyCorrectLights"
-    vr-mode-ui="enabled: false"
+    renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true"
+    background="transparent: true"
+    vr-mode-ui="enabled: true"
     device-orientation-permission-ui="enabled: false">
 
     <a-assets>
