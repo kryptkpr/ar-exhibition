@@ -30,7 +30,9 @@
     }
 
     /* Camera feed must be visible behind the AR canvas (Chrome compatibility) */
-    video { visibility: visible !important; }
+    video {
+      visibility: visible !important;
+    }
 
     body > video,
     a-scene + video,
@@ -166,7 +168,7 @@
     .scan-hint::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
     .scan-hint::after { top: -1px; right: -1px; border-left: none; border-bottom: none; }
     .scan-hint > span::before { bottom: -1px; left: -1px; border-right: none; border-top: none; }
-    .scan-hint > span::after { bottom: -1px; right: -1px; border-left: none; border-bottom: none; }
+    .scan-hint > span::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
 
     .scan-hint.hidden { opacity: 0; }
   </style>
@@ -183,23 +185,8 @@
   <div class="scan-hint" id="scan-hint"><span></span></div>
   <div class="instructions" id="instructions">Aim camera at painting</div>
 
-  <!--
-    Smoothing parameters (tuned for gallery viewing — slow, steady phone movement):
-      filterMinCF: 0.0005     (low = heavy smoothing; default 0.0001)
-      filterBeta: 1000       (low = less reactive to jitter; default 0.001)
-      warmupTolerance: 5        (frames target must be seen before showing AR)
-      missTolerance: 8          (frames target can be lost before hiding AR — higher = less flicker)
-  -->
   <a-scene
-    mindar-image="imageTargetSrc: targets.mind;
-                  autoStart: false;
-                  uiLoading: no;
-                  uiError: no;
-                  uiScanning: no;
-                  filterMinCF: 0.00005;
-                  filterBeta: 0.0005;
-                  warmupTolerance: 5;
-                  missTolerance: 8;"
+    mindar-image="imageTargetSrc: targets.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
     color-space="sRGB"
     renderer="colorManagement: true; physicallyCorrectLights: true; alpha: true; antialias: true"
     background="transparent: true"
@@ -275,7 +262,7 @@
         video.pause();
         video.currentTime = 0;
       } catch (err) {
-        // Some browsers will block this; AR still works, audio waits for user tap
+        // Some browsers will block this; AR still works, just no audio until user tap
       }
 
       startOverlay.classList.add('hidden');
